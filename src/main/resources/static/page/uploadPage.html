@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>UploadPage</title>
+</head>
+<style>
+    .box {
+        width: 300px;
+        height: 300px;
+        margin: 50px auto;
+        padding-top: 30px;
+        background-color: #f5f5f5;
+        border-radius: 10px;
+    }
+    .btn {
+        width: 200px;
+        height: 30px;
+        line-height: 30px;
+        margin: 10px auto;
+        text-align: center;
+        color: #5098F8;
+        border-radius: 4px;
+        border: 1px dashed #5098F8;
+        cursor: pointer;
+    }
+    .uploader {
+        display: flex;
+        align-items: center;
+    }
+
+    .slider-track {
+        width: 70vw;
+        height: 8px;
+        background-color: #080101;
+        margin: 20px 10px 20px 0;
+        border-radius: 4px;
+    }
+
+    .slider-bar {
+        height: 8px;
+        width: 0px;
+        border-radius: inherit;
+        background-image: linear-gradient(to right, #018eb2, #29c9eb);
+        transition: width;
+    }
+
+</style>
+<script src="../js/element-ui/index.js"></script>
+<script src="../js/vue.js"></script>
+<script src="../js/api.js"></script>
+<script src="../js/md5.js"></script>
+<script src="../js/axios.min.js"></script>
+<body>
+
+<body>
+<div class="upload">
+
+
+    <input type="file" id="file-uploader">
+    <div class="uploader">
+        <div class="slider-track">
+            <div class="slider-bar"></div>
+        </div>
+        <div>
+            <span class="percentage" >0</span>%
+        </div>
+        <br>
+        <div>
+            <span id="check" style="display: none" >1</span>
+            上传：<span id="now" onpropertychange="change()">0</span>
+            <br>
+            总：<span id="total" >0</span>
+        </div>
+    </div>
+    <div>
+        <div>
+            文件上传地址: <a  id="loc">www.baidu.com</a>
+        </div>
+    </div>
+</div>
+</body>
+
+<script>
+    const now = document.getElementById("now");
+    now.addEventListener('change', (e) => {
+        console.log('进来了 now.addEventListener')
+        let now = document.getElementById("now");
+        let totalPiece = document.getElementById("total");
+        let sliderBar = document.querySelector(".slider-bar");
+        let percentage = Number(now.innerText) / Number(totalPiece.innerText) * 100;
+        percentage = Number(percentage);
+        // console.log(percentage)
+        sliderBar.style.width =  `${percentage}%`;
+        document.querySelector(".percentage").innerHTML = `${percentage.toFixed(2)}`;
+
+        if(Number(now.innerHTML) === Number(totalPiece.innerHTML)){
+            window.alert("文件已成功上传，等待合并~")
+        }
+    })
+    function change() {
+        console.log('进来了 change()')
+
+        let now = document.getElementById("now");
+        let totalPiece = document.getElementById("total");
+        let sliderBar = document.querySelector(".slider-bar");
+        let percentage = Number(now.innerText) / Number(totalPiece.innerText) * 100;
+        percentage = Number(percentage);
+        // console.log(percentage)
+        sliderBar.style.width =  `${percentage}%`;
+        document.querySelector(".percentage").innerHTML = `${percentage.toFixed(2)}`;
+
+        if(Number(now.innerHTML) === Number(totalPiece.innerHTML)){
+            window.open('http://localhost:8080/page/notice.html','newWindow',
+                'height=300,width=600,top=300,left=200,toolbar=no,menubar=no, scrollbars=no,resizable=no,location=no, status=no')
+        }
+    }
+
+</script>
+
+<script>
+
+    const fileUploader = document.getElementById('file-uploader');
+    fileUploader.addEventListener('change', (event) => {
+        const files = event.target.files;
+        const file = files[0];
+        console.log('文件：', file);
+        console.log('上传文件名字：', file.name);
+        console.log('上传文件大小：', file.size);
+
+        const fileMd5 = hexMD5(file.name);
+        console.log('文件md5为：',fileMd5);
+        let res = confirm('确定上传该文件？');
+        if(res === true) {
+            console.log('点击了确认')
+            let now = document.getElementById("now");
+            now.innerText = Number(0);
+            let totalPiece = document.getElementById("total");
+            totalPiece.innerText = Number(0);
+            let check0 = document.getElementById("check");
+            check0.innerHTML = Number(0);
+            const check =  checkUpload(fileMd5);
+            check.then((res) => {
+                //console.log(res);
+                const checkRes = res.data;
+                if(checkRes === false){
+                    console.log("文件切片准备");
+                    const chuckSum = getChuckSum(file.size);
+                    console.log("一共切",parseInt(chuckSum),"片");
+                    console.log("准备切片文件");
+                    let sliderBar = document.querySelector(".slider-bar");
+                    sliderBar.style.width = "0";
+                    const count1 = [];
+                    const sum = 0;
+                    let totalPiece = document.getElementById("total");
+                    totalPiece.innerText = Number(file.size);
+                    for (let i = 0;i < chuckSum; i++ ){
+                        //count.push(uploadQ(file,file.name,fileMd5,i));
+                        count1.push(getPreUrl({fileId: fileMd5, fileName: file.name, totalPieces: chuckSum, sliceIndex: i}));
+                    }
+                    const allPromise1 = Promise.all(count1);
+                    allPromise1.then(data1=>{
+                        const startTime = Date.now();
+                        console.log(data1);  // data为一个数组  ['请求成功','上传成功']
+                        const count2 = [];
+                        const count2_real = [];
+                        const formDatas = [];
+                        const chuckSizes = [];
+                        for (let i = 0;i < chuckSum; i++ ){
+                            const chunkSize = 5 * 1024 * 1024;
+                            const start = Number(chunkSize) * Number(i);
+                            const end = start + Number(chunkSize);
+                            const blob = file.slice(start, end);
+                            const temp = data1[i];
+                            let formData = new FormData();
+                            formData.append("file", blob); //添加文件对象
+                            count2_real.push(temp.data.msg);
+                            formDatas.push(formData);
+                            chuckSizes.push(blob.size);
+
+                        }
+                        limitRequest(count2_real,formDatas,3,fileMd5,file.name,"main",chuckSum,chuckSizes).then(res => {
+                            console.log(res);
+                        })
+                        // const allPromise2 = Promise.all(wait);
+                        // allPromise2.then(data2=>{
+                        //     console.log(data2)  // data为一个数组  ['请求成功','上传成功']
+                        // }).catch(err2=>{
+                        //     console.log(err2)
+                        // })
+                    }).catch(err1=>{
+                        console.log(err1)
+                    })
+
+                }
+                else {
+                    window.alert("文件已上传过，请重新上传~");
+                }
+            })
+        }else{
+            console.log('点击了取消')
+        }
+    });
+
+
+</script>
+</html>
