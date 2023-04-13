@@ -7,10 +7,8 @@ import com.example.demot.utils.ResultData;
 public interface TaskService extends IService<Task> {
     boolean isFinished(String identifier);
     ResultData getUploadURL(Integer sliceIndex, Integer totalPieces, String fileId, String fileName) throws Exception;
-    ResultData merFile(
-            String fileId,
-            String folderId,
-            int totalPieces,
-            String fileName);
-
+    ResultData merFile(String fileId,String folderId,Integer totalPieces,String fileName);
+    ResultData getFileAddr(String fileId);
+    ResultData saveToRedis(String fileId,Integer sliceIndex);
+    ResultData queryRedisAndReturn(String fileId,Integer chuckNum);
 }

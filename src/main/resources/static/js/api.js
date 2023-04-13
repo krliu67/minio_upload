@@ -12,8 +12,7 @@ const getPreUrl = (params) => {
     return axios({
         url: '/task/getPreUrl',
         method: 'post',
-        params:params,
-        async:false
+        params:params
     })
 }
 
@@ -33,6 +32,33 @@ const uploadFile = (formData,url) => {
         method: 'put',
         headers: {'Content-Type': 'application/octet-stream'},
         data:formData
+    })
+}
+
+// 返回文件地址
+const getFileAddr = (id) => {
+    return axios({
+        url: '/task/getFileAddr',
+        method: 'post',
+        data:{'fileId':id}
+    })
+}
+
+// 保存至redis
+const saveToRedis = (id,chuckId) => {
+    return axios({
+        url: '/task/saveToRedis',
+        method: 'post',
+        data:{'fileId':id,'sliceIndex':chuckId}
+    })
+}
+
+// 查询redis记录
+const queryRedisAndReturn = (id,chuckNum) => {
+    return axios({
+        url: '/task/queryRedisAndReturn',
+        method: 'post',
+        data:{'fileId':id,'chuckNum':chuckNum}
     })
 }
 
@@ -124,7 +150,7 @@ const upF = async (url,file) =>{
 // }
 
 // 控制最大上传数
-const limitRequest = (urls,formDatas, maxNum,fileId,fileName,folderId,totalPieces,chuckSizes) => {
+const limitRequest = (urls,formDatas, maxNum,fileId,fileName,folderId,totalPieces,chuckSizes,chuckIds) => {
 
     return new Promise((resolve) => {
         if (urls.length === 0) {
@@ -148,6 +174,7 @@ const limitRequest = (urls,formDatas, maxNum,fileId,fileName,folderId,totalPiece
             const url = urls[i];
             const formData = formDatas[i];
             const chuckSize = chuckSizes[i];
+            const chuckId = chuckIds[i];
             index++;
             //console.log(url);
             const fileMd5 = fileId;
@@ -156,17 +183,20 @@ const limitRequest = (urls,formDatas, maxNum,fileId,fileName,folderId,totalPiece
             const fileName0 = fileName;
             try {
                 const response = await uploadFile(formData,url);
+                const saveToRedisRes = await saveToRedis(fileMd5,chuckId);
                 let now = document.getElementById("now");
                 let n = now.innerHTML;
                 now.innerText = Number(n) + Number(chuckSize);
                 change();
                 results[i] = response;
+
             } catch (err) {
                 results[i] = err;
             } finally {
                 cnt++;
                 // 判断是否请求都完成
                 if (cnt === urls.length) {
+
                     console.log('所有请求已完成')
                     console.log("准备合并文件");
                     const startTime = Date.now();
@@ -175,6 +205,7 @@ const limitRequest = (urls,formDatas, maxNum,fileId,fileName,folderId,totalPiece
                     //console.log(costTime);//两个时间相差的秒数
                     merge.then( (mergeRes) => {
                         if(mergeRes.data.code === 200){
+                            change();
                             const endTime = Date.now();
                             console.log('endTime:',endTime);
                             const costTime = parseInt(endTime - startTime);
@@ -190,6 +221,7 @@ const limitRequest = (urls,formDatas, maxNum,fileId,fileName,folderId,totalPiece
                 }
                 request()
             }
+
         }
 
         // maxNum和urls.length取最小进行调用

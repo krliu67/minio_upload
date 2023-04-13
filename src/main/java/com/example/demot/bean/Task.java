@@ -75,4 +75,10 @@ public class Task {
      * 数据类型:Integer
      */
     private Integer chunkNum;
+
+    /**
+     * 文件地址，
+     *  String
+     */
+    private String fileAddr;
 }

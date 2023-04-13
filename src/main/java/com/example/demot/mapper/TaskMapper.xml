@@ -4,7 +4,4 @@
     <select id="findByFileId" resultType="com.example.demot.bean.Task">
         select * from sys_upload_task where file_identifier = #{id}
     </select>
-    <select id="saveInsert" resultType="boolean">
-
-    </select>
 </mapper>

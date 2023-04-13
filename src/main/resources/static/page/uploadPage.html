@@ -51,7 +51,8 @@
 <script src="../js/api.js"></script>
 <script src="../js/md5.js"></script>
 <script src="../js/axios.min.js"></script>
-<body>
+<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
 
 <body>
 <div class="upload">
@@ -166,8 +167,9 @@
                         const count2_real = [];
                         const formDatas = [];
                         const chuckSizes = [];
+                        const chuckIds = [];
                         for (let i = 0;i < chuckSum; i++ ){
-                            const chunkSize = 5 * 1024 * 1024;
+                            const chunkSize = 10 * 1024 * 1024;
                             const start = Number(chunkSize) * Number(i);
                             const end = start + Number(chunkSize);
                             const blob = file.slice(start, end);
@@ -177,9 +179,9 @@
                             count2_real.push(temp.data.msg);
                             formDatas.push(formData);
                             chuckSizes.push(blob.size);
-
+                            chuckIds.push(i);
                         }
-                        limitRequest(count2_real,formDatas,3,fileMd5,file.name,"main",chuckSum,chuckSizes).then(res => {
+                        limitRequest(count2_real,formDatas,10,fileMd5,file.name,"uploaddemo",chuckSum,chuckSizes,chuckIds).then(res => {
                             console.log(res);
                         })
                         // const allPromise2 = Promise.all(wait);

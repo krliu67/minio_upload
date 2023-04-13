@@ -1,6 +1,5 @@
 package com.example.demot.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.example.demot.mapper.TaskMapper;
 import com.example.demot.service.TaskService;
@@ -12,7 +11,10 @@ import io.minio.http.Method;
 import io.minio.messages.Item;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.CrossOrigin;
 
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -27,20 +29,27 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
 
     @Autowired
     private TaskService taskService;
+
     @Autowired
     private TaskMapper taskMapper;
 
-    private static AtomicInteger counter = new AtomicInteger(0);
+    @Autowired
+    private RedisTemplate<Object, Object> redisTemplate;
 
-    private static String minioUrl = "http://127.0.0.1:9000";
+    private AtomicInteger counter = new AtomicInteger(0);
 
-    private static String accessKey = "minioadmin";
+    //private String minioUrl = "http://localhost:9000";
+    private String minioUrl = "http://192.168.8.60:9000";
 
-    private static String secretKey = "minioadmin";
+    private String accessKey = "admin";
+    //private String accessKey = "minioadmin";
+
+    private String secretKey = "minioadmin";
 
     MinioClient minioClient = MinioClient.builder().endpoint(minioUrl).credentials(accessKey, secretKey).build();
 
     @Override
+    @CrossOrigin
     public boolean isFinished(String identifier) {
         Map<String,Object> map = new HashMap<String, Object>();
         map.put("file_identifier",identifier);
@@ -55,6 +64,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     }
 
     @Override
+    @CrossOrigin
     public ResultData getUploadURL(Integer sliceIndex, Integer totalPieces, String fileId, String fileName) throws Exception {
         if (!this.minioClient.bucketExists(BucketExistsArgs.builder().bucket("temp").build())) {
             this.minioClient.makeBucket(MakeBucketArgs.builder().bucket("temp").build());
@@ -75,14 +85,15 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         // 获取上传路径
         String product = this.minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
                 // 这里必须是PUT，如果是GET的话就是文件访问地址了。如果是POST上传会报错.
-                .method(Method.PUT).bucket(bucketName).object(objectName).expiry(10, TimeUnit.MINUTES).build());
+                .method(Method.PUT).bucket(bucketName).object(objectName).expiry(20, TimeUnit.MINUTES).build());
         System.out.println(product);
 
         return new ResultData(200, null, product, sliceIndex);
     }
 
     @Override
-    public ResultData merFile(String fileId, String folderId, int totalPieces, String fileName) {
+    @CrossOrigin
+    public ResultData merFile(String fileId, String folderId, Integer totalPieces, String fileName) {
         try {
             String objectName = fileId;
             String bucketName = folderId;
@@ -152,10 +163,13 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             }
             System.out.println("删除完毕：" + "temp/" + objectName + "；合并文件完成上传，保存文件信息到数据库");
 
+            // 删除redis缓存
+            boolean delRedis = redisTemplate.delete("uploaddemo:"+fileId);
+            System.out.println("删除文件" + fileId + "，结果为：" + delRedis);
+
             // 测试user
             // System.out.println(user.toString());
-            String product = this.minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
-                    .method(Method.GET).bucket(bucketName).object(targetObjectName).expiry(10, TimeUnit.MINUTES).build());
+            String product = minioUrl + "/" + bucketName + "/" + targetObjectName;
             System.out.println("文件访问地址:" + product);
 
             // 存入数据库中
@@ -166,6 +180,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
             task.setFileIdentifier(fileId);
             task.setFileName(fileName);
             task.setTotalSize(fileSize);
+            task.setFileAddr(product);
 
 
             if (taskMapper.insert(task) == 1) {
@@ -181,5 +196,66 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
         // 设置失败返回值
         return new ResultData(500, null, "合并失败", 0);
     }
+
+    @Override
+    @CrossOrigin
+    public ResultData getFileAddr(String fileId) {
+        Map<String,Object> map = new HashMap<String, Object>();
+        map.put("file_identifier",fileId);
+        List<Task> tasks = taskMapper.selectByMap(map);
+        System.out.println("getFileAddr: " + fileId);
+        try{
+            String path = tasks.get(0).getFileAddr();
+            System.out.println("getFileAddr: " + fileId + " 成功");
+            return new ResultData(200, path, "找到了", 0);
+        }catch (Exception e){
+            System.out.println("getFileAddr: " + fileId + " 失败");
+            return new ResultData(500, null, e.toString(), 0);
+        }
     }
+
+    @Override
+    @CrossOrigin
+    public ResultData saveToRedis(String fileId, Integer sliceIndex) {
+        try{
+            String num = sliceIndex.toString();
+            Long temp = redisTemplate.opsForList().rightPush("uploaddemo:"+fileId,num);
+            System.out.println("saveToRedis: " + fileId + ", "+ sliceIndex  + " 成功");
+            return new ResultData(200, null, "设置成功", 0);
+        }catch (Exception e){
+            System.out.println("saveToRedis: " + fileId + ", "+ sliceIndex  + " 失败");
+            return new ResultData(500, null, e.toString(), 0);
+        }
+    }
+
+    @Override
+    @CrossOrigin
+    public ResultData queryRedisAndReturn(String fileId,Integer chuckNum) {
+        List<Integer> lists = new ArrayList<>();
+        for (int i = 0; i < chuckNum; i++) {
+            lists.add(i);
+        }
+
+        try{
+            Long num = redisTemplate.opsForList().size("uploaddemo:"+fileId);
+            List<Object> res = redisTemplate.opsForList().range("uploaddemo:"+fileId,0,num);
+
+            for (int i = 0; i < res.size(); i++) {
+                Integer tempNum1 = Integer.parseInt(res.get(i).toString());
+                if(lists.contains(tempNum1)){
+                    // 如果有，就去掉
+                    boolean t = lists.remove(tempNum1);
+                    System.out.println(fileId + "已经上传 " + res.get(i) + "号文件" );
+                }
+            }
+            Collections.sort(lists);
+            System.out.println("queryRedisAndReturn: " + fileId + " 成功");
+            return new ResultData(200, lists, "查询成功", 0);
+        }catch (Exception e){
+            System.out.println("queryRedisAndReturn: " + fileId + " 不存在");
+
+            return new ResultData(200, lists, e.toString(), 0);
+        }
+    }
+}
 

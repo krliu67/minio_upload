@@ -1,14 +1,24 @@
+server:
+  port: 3081
 spring:
+  application:
+    name: DemotApplication
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/db1?serverTimezone=GMT%2B8&useUnicode=true&characterEncoding=UTF-8&useSSL=false
+    url: jdbc:mysql://192.168.8.60:3306/upload_demo?allowMultiQueries=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
+    #url: jdbc:mysql://localhost:3306/db1?allowMultiQueries=true&useUnicode=true&characterEncoding=UTF-8&serverTimezone=GMT%2B8
     username: root
-    password: 123456
+    password: Admin@123
+    #password: 123456
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
   main:
     allow-circular-references: true
-mybatis:
-  type-aliases-package: com.example.demot.mapper
-  mapper-locations: classpath:mapper/*.xml
+  profiles:
+    active: mapper.service
+  redis:
+    host: 192.168.8.11
+    port: 6379
+    #password
+    database: 1
