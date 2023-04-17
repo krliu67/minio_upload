@@ -8,4 +8,4 @@ mysql
 
 spring
 
-Well, actually i was intended to focus on the logic about cutting big file into slices. Never have i realise that i spend so many times in the front, though it just a demo.
+Well, actually I intended to focus on the logic of cutting big files into slices. Never have I realized that I spend so much time in the front, though it is just a demo.
