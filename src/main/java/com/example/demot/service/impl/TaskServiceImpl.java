@@ -39,7 +39,7 @@ public class TaskServiceImpl extends ServiceImpl<TaskMapper, Task> implements Ta
     private AtomicInteger counter = new AtomicInteger(0);
 
     //private String minioUrl = "http://localhost:9000";
-    private String minioUrl = "http://192.168.8.60:9000";
+    private String minioUrl = "http://X0:9000";
 
     private String accessKey = "admin";
     //private String accessKey = "minioadmin";
